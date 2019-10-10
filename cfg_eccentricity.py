@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+#
+# Author: Adrian Herrera
+#
+# Determine the eccentricity of an LLVM control flow graph
+#
 
 
 from __future__ import print_function
