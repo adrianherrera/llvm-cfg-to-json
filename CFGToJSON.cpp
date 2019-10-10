@@ -66,6 +66,7 @@ bool CFGToJSON::runOnFunction(Function &F) {
   Json::Value JNodes;
   Json::Value JEdges;
   Json::Value JCalls;
+  Json::Value JReturns;
 
   while (!Worklist.empty()) {
     auto *BB = Worklist.pop_back_val();
@@ -103,6 +104,11 @@ bool CFGToJSON::runOnFunction(Function &F) {
         }
       }
     }
+
+    // Save the return
+    if (isa<ReturnInst>(BB->getTerminator())) {
+      JReturns.append(BBLabel);
+    }
   }
 
   // Print the results
@@ -113,6 +119,7 @@ bool CFGToJSON::runOnFunction(Function &F) {
   JObj["nodes"] = JNodes;
   JObj["edges"] = JEdges;
   JObj["calls"] = JCalls;
+  JObj["returns"] = JReturns;
 
   std::string Filename = ("cfg." + F.getName() + ".json").str();
   errs() << "Writing '" << Filename << "'...";
