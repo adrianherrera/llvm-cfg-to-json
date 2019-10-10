@@ -100,7 +100,7 @@ def main():
     # CFG into weakly-connected components and find the one with our given entry
     # point
     sub_cfg = None
-    entry_node = 'main.%s' % cfg_dict[args.entry]['entry']
+    entry_node = '%s.%s' % (args.entry, cfg_dict[args.entry]['entry'])
     for wcc in nx.weakly_connected_component_subgraphs(cfg):
         if entry_node in wcc:
             sub_cfg = wcc

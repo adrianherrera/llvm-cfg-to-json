@@ -1,8 +1,8 @@
 # LLVM CFG to JSON
 
-Exports an LLVM control flow graph (CFG) (including function calls) to JSON.
-This pass is different from LLVM's standard CFG printer in that it captures both
-*intra* and *inter* procedural edges (i.e., function calls).
+Exports an LLVM control flow graph (CFG) to JSON. This pass is different from
+LLVM's standard CFG printer in that it captures both *intra* and *inter*
+procedural edges (i.e., function calls).
 
 ## Building
 
@@ -30,9 +30,9 @@ make
 
 ## `cfg_eccentricity.py`
 
-Using the results produced by the LLVM pass, calculate the eccentricity from the
-CFG's entry point. The script an also (optionally) produce a DOT graph of the
-CFG.
+Using the results produced by the LLVM pass, calculate the graph eccentricity
+from the CFG's entry point. The script can also (optionally) produce a DOT graph
+of the CFG.
 
 ### Running
 
