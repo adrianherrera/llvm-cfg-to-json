@@ -139,3 +139,11 @@ bool CFGToJSON::runOnFunction(Function &F) {
 
 static RegisterPass<CFGToJSON> X("cfg-to-json", "Export a CFG to JSON", false,
                                  false);
+
+static void registerCFGToJSON(const PassManagerBuilder &, legacy::PassManagerBase &PM) {
+    PM.add(new CFGToJSON());
+}
+
+static RegisterStandardPasses RegisterCFGToJSON(PassManagerBuilder::EP_OptimizerLast, registerCFGToJSON);
+
+static RegisterStandardPasses RegisterCFGToJSON0(PassManagerBuilder::EP_EnabledOnOptLevel0, registerCFGToJSON);
