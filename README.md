@@ -31,4 +31,12 @@ make
 ## `cfg_eccentricity.py`
 
 Using the results produced by the LLVM pass, calculate the eccentricity from the
-CFG's entry point.
+CFG's entry point. The script an also (optionally) produce a DOT graph of the
+CFG.
+
+### Running
+
+```bash
+clang -fplugin=/path/to/build/libLLVMCFGToJSON.so /path/to/src.c
+python cfg_eccentricity.py `pwd`
+```
