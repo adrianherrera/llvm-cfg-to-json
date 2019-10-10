@@ -1,3 +1,17 @@
+//===-- CFGToJSON.cpp - Export CFG to JSON --------------------------------===//
+//
+//                     The LLVM Compiler Infrastructure
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
+//
+//===----------------------------------------------------------------------===//
+///
+/// \file
+/// Exports an LLVM control flow graph (CFG), including function calls, to JSON.
+///
+//===----------------------------------------------------------------------===//
+
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/Function.h"
