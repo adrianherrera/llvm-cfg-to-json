@@ -117,6 +117,7 @@ bool CFGToJSON::runOnFunction(Function &F) {
   // Print the results
 
   Json::Value JObj;
+  JObj["module"] = M->getName().str();
   JObj["function"] = F.getName().str();
   JObj["entry"] = getBBLabel(&F.getEntryBlock());
   JObj["nodes"] = JNodes;
