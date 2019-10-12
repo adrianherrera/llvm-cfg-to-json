@@ -17,6 +17,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
@@ -60,6 +61,8 @@ void CFGToJSON::getAnalysisUsage(AnalysisUsage &AU) const {
 }
 
 bool CFGToJSON::runOnFunction(Function &F) {
+  const Module *M = F.getParent();
+
   SmallPtrSet<BasicBlock *, 32> SeenBBs;
   SmallVector<BasicBlock *, 32> Worklist = {&F.getEntryBlock()};
 
@@ -121,7 +124,8 @@ bool CFGToJSON::runOnFunction(Function &F) {
   JObj["calls"] = JCalls;
   JObj["returns"] = JReturns;
 
-  std::string Filename = ("cfg." + F.getName() + ".json").str();
+  std::string Filename =
+      ("cfg." + M->getName() + "." + F.getName() + ".json").str();
   errs() << "Writing '" << Filename << "'...";
 
   std::error_code EC;
