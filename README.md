@@ -28,15 +28,16 @@ CXXFLAGS="-fplugin=/path/to/build/libLLVMCFGToJSON.so"
 make
 ```
 
-## `cfg_eccentricity.py`
+## `cfg_stats.py`
 
-Using the results produced by the LLVM pass, calculate the graph eccentricity
-from the CFG's entry point. The script can also (optionally) produce a DOT graph
-of the CFG.
+Using the results produced by the LLVM pass, calculate some interesting graph
+statistics (e.g., number of basic blocks, number of edges, and the graph
+eccentricity from the CFG's entry point). The script can also (optionally)
+produce a DOT graph of the CFG.
 
 ### Running
 
 ```bash
 clang -fplugin=/path/to/build/libLLVMCFGToJSON.so /path/to/src.c
-python cfg_eccentricity.py `pwd`
+python cfg_stats.py `pwd`
 ```

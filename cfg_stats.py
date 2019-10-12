@@ -114,7 +114,12 @@ def main():
     if not sub_cfg:
         raise Exception('Could not find CFG with entry point `%s`' % args.entry)
 
+    num_bbs = sub_cfg.number_of_nodes()
+    num_edges = sub_cfg.size()
     entry_eccentricity = nx.eccentricity(sub_cfg, v=entry_node)
+
+    print('# basic blocks: %d' % num_bbs)
+    print('# edges: %d' % num_edges)
     print('eccentricity from `%s`: %d' % (entry_node, entry_eccentricity))
 
 
