@@ -71,6 +71,8 @@ bool CFGToJSON::runOnFunction(Function &F) {
   Json::Value JCalls;
   Json::Value JReturns;
 
+  unsigned NumIndirectCalls = 0;
+
   while (!Worklist.empty()) {
     auto *BB = Worklist.pop_back_val();
 
@@ -104,6 +106,8 @@ bool CFGToJSON::runOnFunction(Function &F) {
           JCall["src"] = BBLabel;
           JCall["dst"] = CalledF->getName().str();
           JCalls.append(JCall);
+        } else {
+          NumIndirectCalls++;
         }
       }
     }
@@ -124,6 +128,7 @@ bool CFGToJSON::runOnFunction(Function &F) {
   JObj["edges"] = JEdges;
   JObj["calls"] = JCalls;
   JObj["returns"] = JReturns;
+  JObj["indirect_calls"] = NumIndirectCalls;
 
   std::string Filename =
       ("cfg." + M->getName() + "." + F.getName() + ".json").str();

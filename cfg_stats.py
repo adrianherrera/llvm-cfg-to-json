@@ -41,11 +41,14 @@ def main():
     # Load all of the control flow graphs (CFG)
 
     cfg_dict = {}
+    num_indirect_calls = 0
+
     for json_path in glob.glob(os.path.join(json_dir, 'cfg.*.json')):
         with open(json_path, 'r') as json_file:
             data = json.load(json_file)
             func = data.pop('function')
             cfg_dict[func] = data
+            num_indirect_calls += data['indirect_calls']
 
     # Turn the CFGs into a networkx graph
 
@@ -120,6 +123,7 @@ def main():
 
     print('# basic blocks: %d' % num_bbs)
     print('# edges: %d' % num_edges)
+    print('# indirect calls: %d' % num_indirect_calls)
     print('eccentricity from `%s`: %d' % (entry_node, entry_eccentricity))
 
 
