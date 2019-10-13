@@ -2,7 +2,7 @@
 #
 # Author: Adrian Herrera
 #
-# Determine the eccentricity of an LLVM control flow graph
+# Calculate useful statistics of an LLVM control flow graph
 #
 
 
@@ -20,14 +20,14 @@ import pydot
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Calculate the eccentricity '
-                                                 'of an LLVM CFG')
+    parser = argparse.ArgumentParser(description='Calculate statistics of an '
+                                                 'LLVM CFG')
     parser.add_argument('json_dir',
                         help='Path to directory containing JSON CFGs')
     parser.add_argument('--dot', action='store_true', required=False,
                         help='Generate DOT file')
     parser.add_argument('-e', '--entry', action='store', required=False,
-                        default='main', help='Alternative entry point')
+                        default='main', help='Program entry point')
 
     return parser.parse_args()
 
