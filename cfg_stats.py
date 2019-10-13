@@ -9,7 +9,7 @@
 from __future__ import print_function
 
 import argparse
-from collections import defaultdict
+from collections import defaultdict, Counter
 import glob
 import json
 import os
@@ -46,6 +46,12 @@ def find_callee(cfg_dict, callee_func):
     return {}
 
 
+def get_num_indirect_calls(graph):
+    indirect_call_counts = [count for _, count in
+                            graph.nodes(data='indirect_calls') if count]
+    return sum(indirect_call_counts)
+
+
 def main():
     args = parse_args()
 
@@ -57,7 +63,6 @@ def main():
 
     cfg_dict = defaultdict(dict)
     entry_pts = []
-    num_indirect_calls = 0
 
     for json_path in glob.glob(os.path.join(json_dir, 'cfg.*.json')):
         with open(json_path, 'r') as json_file:
@@ -71,7 +76,6 @@ def main():
             # Collect other interesting stats
             if func == args.entry:
                 entry_pts.append((mod, func))
-            num_indirect_calls += data.pop('indirect_calls')
 
     # Turn the CFGs into a networkx graph
 
@@ -104,6 +108,16 @@ def main():
             for edge in func_dict['edges']:
                 cfg.add_edge(create_node(mod, func, edge['src']),
                              create_node(mod, func, edge['dst']))
+
+            # JSON indirect calls may be `none`
+            if not func_dict.get('indirect_calls'):
+                continue
+
+            # Count indirect calls and assign them to the nodes that make them
+            indirect_call_count = Counter(func_dict['indirect_calls'])
+            for n in indirect_call_count:
+                node = create_node(mod, func, n)
+                cfg.node[node]['indirect_calls'] = indirect_call_count[n]
 
     # Add interprocedural edges
     for mod, mod_dict in cfg_dict.items():
@@ -160,11 +174,13 @@ def main():
 
         num_bbs = reachable_cfg.number_of_nodes()
         num_edges = reachable_cfg.size()
+        num_indirect_calls = get_num_indirect_calls(reachable_cfg)
         eccentricity = nx.eccentricity(reachable_cfg, v=entry_node)
 
         print('`%s.%s` stats' % (entry_mod, entry_func))
         print('  num. basic blocks: %d' % num_bbs)
         print('  num. edges: %d' % num_edges)
+        print('  num. indirect calls: %d' % num_indirect_calls)
         print('  eccentricity from `%s`: %d' % (entry_node, eccentricity))
         print()
 
