@@ -84,49 +84,28 @@ def main():
 
     cfg = nx.DiGraph()
 
-    # Add intraprocedural edges
     for mod, mod_dict in cfg_dict.items():
         for func, func_dict in mod_dict.items():
             if func in blacklist:
                 continue
 
-            # JSON nodes may be `none`
-            if not func_dict.get('nodes'):
-                continue
-
-            # Insert a node into the CFG with the module and function as
-            # attributes
-            for node in func_dict['nodes']:
-                cfg.add_node(create_node(mod, func, node), module=mod,
-                             function=func)
-
-            # JSON edges may be `none`
-            if not func_dict.get('edges'):
-                continue
-
             # Add intraprocedural edges
-            for edge in func_dict['edges']:
-                cfg.add_edge(create_node(mod, func, edge['src']),
-                             create_node(mod, func, edge['dst']))
+            edges = func_dict.get('edges')
+            if edges is None:
+                edges = []
 
-            # JSON indirect calls may be `none`
-            if not func_dict.get('indirect_calls'):
-                continue
+            for edge in edges:
+                src = create_node(mod, func, edge['src'])
+                cfg.add_edge(src, create_node(mod, func, edge['dst']))
+                cfg.node[src]['module'] = mod
+                cfg.node[src]['function'] = func
 
-            # Count indirect calls and assign them to the nodes that make them
-            indirect_call_count = Counter(func_dict['indirect_calls'])
-            for n in indirect_call_count:
-                node = create_node(mod, func, n)
-                cfg.node[node]['indirect_calls'] = indirect_call_count[n]
+            # Add interprocedural edges
+            calls = func_dict.get('calls')
+            if calls is None:
+                calls = []
 
-    # Add interprocedural edges
-    for mod, mod_dict in cfg_dict.items():
-        for func, func_dict in mod_dict.items():
-            # JSON calls may be `none`
-            if not func_dict.get('calls'):
-                continue
-
-            for call in func_dict['calls']:
+            for call in calls:
                 # Add forward edge
                 #
                 # If we don't know anything about the callee function (such as
@@ -149,6 +128,16 @@ def main():
                 for ret in callee_dict['returns']:
                     cfg.add_edge(create_node(mod, callee, ret),
                                  create_node(mod, func, call['src']))
+
+            # Count indirect calls and assign them to the nodes that make them
+            indirect_calls = func_dict.get('indirect_calls')
+            if indirect_calls is None:
+                indirect_calls = []
+
+            indirect_call_count = Counter(indirect_calls)
+            for n in indirect_call_count:
+                node = create_node(mod, func, n)
+                cfg.node[node]['indirect_calls'] = indirect_call_count[n]
 
     # Output to DOT
     if args.dot:
