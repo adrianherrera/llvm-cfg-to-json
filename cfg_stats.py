@@ -106,7 +106,7 @@ def main():
                 calls = []
 
             for call in calls:
-                # Add forward edge
+                # Add forward (call) edge
                 #
                 # If we don't know anything about the callee function (such as
                 # its entry block), skip it
@@ -119,13 +119,12 @@ def main():
                              create_node(callee_dict['module'], callee,
                                          callee_dict['entry']))
 
-                # Add backward edges (if they exist)
-                #
-                # JSON returns may be `none`
-                if not callee_dict.get('returns'):
-                    continue
+                # Add backward (return) edges
+                returns = callee_dict.get('returns')
+                if returns is None:
+                    returns = []
 
-                for ret in callee_dict['returns']:
+                for ret in returns:
                     cfg.add_edge(create_node(mod, callee, ret),
                                  create_node(mod, func, call['src']))
 
