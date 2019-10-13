@@ -36,6 +36,16 @@ def create_node(mod, func, identifier):
     return '%s.%s.%s' % (mod, func, identifier)
 
 
+def find_callee(cfg_dict, callee_func):
+    # TODO optimize
+    for mod_dict in cfg_dict.values():
+        for func, func_dict in mod_dict.items():
+            if callee_func == func:
+                return func_dict
+
+    return {}
+
+
 def main():
     args = parse_args()
 
@@ -54,13 +64,13 @@ def main():
             data = json.load(json_file)
 
             # Build the CFG
-            module = data.pop('module')
+            mod = data['module']
             func = data.pop('function')
-            cfg_dict[module][func] = data
+            cfg_dict[mod][func] = data
 
             # Collect other interesting stats
             if func == args.entry:
-                entry_pts.append((module, func))
+                entry_pts.append((mod, func))
             num_indirect_calls += data.pop('indirect_calls')
 
     # Turn the CFGs into a networkx graph
@@ -76,10 +86,21 @@ def main():
             if func in blacklist:
                 continue
 
+            # JSON nodes may be `none`
+            if not func_dict.get('nodes'):
+                continue
+
+            # Insert a node into the CFG with the module and function as
+            # attributes
+            for node in func_dict['nodes']:
+                cfg.add_node(create_node(mod, func, node), module=mod,
+                             function=func)
+
             # JSON edges may be `none`
             if not func_dict.get('edges'):
                 continue
 
+            # Add intraprocedural edges
             for edge in func_dict['edges']:
                 cfg.add_edge(create_node(mod, func, edge['src']),
                              create_node(mod, func, edge['dst']))
@@ -97,12 +118,13 @@ def main():
                 # If we don't know anything about the callee function (such as
                 # its entry block), skip it
                 callee = call['dst']
-                callee_dict = cfg_dict.get(callee, {})
+                callee_dict = find_callee(cfg_dict, callee)
                 if 'entry' not in callee_dict:
                     continue
 
                 cfg.add_edge(create_node(mod, func, call['src']),
-                             create_node(mod, func, callee_dict['entry']))
+                             create_node(callee_dict['module'], callee,
+                                         callee_dict['entry']))
 
                 # Add backward edges (if they exist)
                 #
@@ -120,26 +142,31 @@ def main():
         write_dot(cfg, 'cfg.dot')
         print()
 
-    # The resulting CFG will probably not be strongly connected. So split the
-    # CFG into weakly-connected components and find the one with our given entry
-    # point(s)
-    for sub_cfg in nx.weakly_connected_component_subgraphs(cfg):
-        for entry_mod, entry_func in entry_pts:
-            entry_node = create_node(entry_mod, entry_func,
-                                     cfg_dict[entry_mod][entry_func]['entry'])
+    # Depending on how the target was compiled and the CFGToJSON pass run, there
+    # may be multiple entry points (e.g., multiple driver programs, each with
+    # their own main function).
+    #
+    # Thus, iterate over each entry point and reduce the CFG to only those nodes
+    # reachable from the entry point. This allows us to calculate eccentricity,
+    # because the CFG is now connected.
+    for entry_mod, entry_func in entry_pts:
+        entry_node = create_node(entry_mod, entry_func,
+                                 cfg_dict[entry_mod][entry_func]['entry'])
 
-            if entry_node not in sub_cfg:
-                continue
+        descendants = nx.descendants(cfg, entry_node)
+        descendants.add(entry_node)
+        reachable_cfg = cfg.copy()
+        reachable_cfg.remove_nodes_from(n for n in cfg if n not in descendants)
 
-            num_bbs = sub_cfg.number_of_nodes()
-            num_edges = sub_cfg.size()
-            eccentricity = nx.eccentricity(sub_cfg, v=entry_node)
+        num_bbs = reachable_cfg.number_of_nodes()
+        num_edges = reachable_cfg.size()
+        eccentricity = nx.eccentricity(reachable_cfg, v=entry_node)
 
-            print('`%s.%s` stats' % (entry_mod, entry_func))
-            print('  num. basic blocks: %d' % num_bbs)
-            print('  num. edges: %d' % num_edges)
-            print('  eccentricity from `%s`: %d' % (entry_node, eccentricity))
-            print()
+        print('`%s.%s` stats' % (entry_mod, entry_func))
+        print('  num. basic blocks: %d' % num_bbs)
+        print('  num. edges: %d' % num_edges)
+        print('  eccentricity from `%s`: %d' % (entry_node, eccentricity))
+        print()
 
 
 if __name__ == '__main__':
