@@ -157,6 +157,11 @@ def main():
         entry_node = create_node(entry_mod, entry_func,
                                  cfg_dict[entry_mod][entry_func]['entry'])
 
+        if entry_node not in cfg:
+            print('Entry point `%s` does not exist in the CFG. Skipping...\n' \
+                % entry_node)
+            continue
+
         descendants = nx.descendants(cfg, entry_node)
         descendants.add(entry_node)
         reachable_cfg = cfg.copy()
