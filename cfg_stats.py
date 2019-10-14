@@ -136,6 +136,8 @@ def main():
             indirect_call_count = Counter(indirect_calls)
             for n in indirect_call_count:
                 node = create_node(mod, func, n)
+                if node not in cfg:
+                    cfg.add_node(node)
                 cfg.node[node]['indirect_calls'] = indirect_call_count[n]
 
     # Output to DOT
