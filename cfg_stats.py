@@ -27,7 +27,10 @@ def parse_args():
     parser.add_argument('--dot', action='store_true', required=False,
                         help='Generate DOT file')
     parser.add_argument('-e', '--entry', action='store', required=False,
-                        default='main', help='Program entry point')
+                        default='main',
+                        help='Program entry point (function name)')
+    parser.add_argument('-m', '--module', action='store', required=False,
+                        help='Module name containing the entry point')
 
     return parser.parse_args()
 
@@ -74,7 +77,8 @@ def main():
             cfg_dict[mod][func] = data
 
             # Collect other interesting stats
-            if func == args.entry:
+            if func == args.entry and \
+                    (args.module is None or mod == args.module):
                 entry_pts.append((mod, func))
 
     # Turn the CFGs into a networkx graph
