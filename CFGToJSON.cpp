@@ -129,6 +129,10 @@ bool CFGToJSON::runOnFunction(Function &F) {
   JObj["returns"] = JReturns;
   JObj["indirect_calls"] = JIndirectCalls;
 
+  std::string BaseModuleName = M->getName();            // The module name can take the form of absolute path,
+  size_t DelimiterPosition = BaseModuleName.rfind("/"); // in which case we just take the base name
+  if (DelimiterPosition != std::string::npos) BaseModuleName = std::string(M->getName().substr(DelimiterPosition + 1));
+  
   std::string Filename =
       ("cfg." + M->getName() + "." + F.getName() + ".json").str();
   errs() << "Writing '" << Filename << "'...";
