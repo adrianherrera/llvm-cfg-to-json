@@ -20,6 +20,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 #include "json/json.h"
@@ -129,8 +130,8 @@ bool CFGToJSON::runOnFunction(Function &F) {
   JObj["returns"] = JReturns;
   JObj["indirect_calls"] = JIndirectCalls;
 
-  std::string Filename =
-      ("cfg." + M->getName() + "." + F.getName() + ".json").str();
+  StringRef ModName = sys::path::filename(M->getName());
+  std::string Filename = ("cfg." + ModName + "." + F.getName() + ".json").str();
   errs() << "Writing '" << Filename << "'...";
 
   std::error_code EC;
