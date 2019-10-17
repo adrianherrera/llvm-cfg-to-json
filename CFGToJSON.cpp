@@ -16,6 +16,7 @@
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
@@ -98,7 +99,7 @@ bool CFGToJSON::runOnFunction(Function &F) {
 
     // Save the calls
     for (auto &I : *BB) {
-      if (isa<CallInst>(I) || isa<InvokeInst>(I)) {
+      if ((isa<CallInst>(I) && !isa<IntrinsicInst>(I)) || isa<InvokeInst>(I)) {
         CallSite CS(&I);
         auto *CalledF = CS.getCalledFunction();
         if (CalledF) {
