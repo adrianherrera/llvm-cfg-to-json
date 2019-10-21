@@ -11,6 +11,7 @@ from __future__ import print_function
 import argparse
 from collections import defaultdict, Counter
 import glob
+import logging
 import json
 import os
 
@@ -31,6 +32,10 @@ def parse_args():
                         help='Program entry point (function name)')
     parser.add_argument('-m', '--module', action='store', required=False,
                         help='Module name containing the entry point')
+    parser.add_argument('-l', '--log', action='store', default='info',
+                        choices={'debug', 'info', 'warning', 'error',
+                                 'critical'}, dest='loglevel',
+                        help='Logging level')
 
     return parser.parse_args()
 
@@ -58,9 +63,16 @@ def get_num_indirect_calls(graph):
 def main():
     args = parse_args()
 
+    # Check that the input directory is valid
     json_dir = args.json_dir
     if not os.path.isdir(json_dir):
         raise Exception('Invalid JSON directory `%s`' % json_dir)
+
+    # Set the logging level
+    numeric_log_level = getattr(logging, args.loglevel.upper(), None)
+    if not isinstance(numeric_log_level, int):
+        raise ValueError('Invalid log level: %s' % args.loglevel)
+    logging.basicConfig(level=numeric_log_level)
 
     # Load all of the control flow graphs (CFG)
 
@@ -68,6 +80,7 @@ def main():
     entry_pts = []
 
     for json_path in glob.glob(os.path.join(json_dir, 'cfg.*.json')):
+        logging.debug('Parsing `%s`', json_path)
         with open(json_path, 'r') as json_file:
             data = json.load(json_file)
 
@@ -79,6 +92,7 @@ def main():
             # Collect other interesting stats
             if func == args.entry and \
                     (args.module is None or mod == args.module):
+                logging.debug('New entry point `%s` in module %s', func, mod)
                 entry_pts.append((mod, func))
 
     # Turn the CFGs into a networkx graph
@@ -91,6 +105,7 @@ def main():
     for mod, mod_dict in cfg_dict.items():
         for func, func_dict in mod_dict.items():
             if func in blacklist:
+                logging.info('Function `%s` is blacklisted. Skipping', func)
                 continue
 
             # Add intraprocedural edges
@@ -126,6 +141,8 @@ def main():
                 # Add backward (return) edges
                 returns = callee_dict.get('returns')
                 if returns is None:
+                    logging.debug('function `%s` has no return instruction(s)',
+                                  callee)
                     returns = []
 
                 for ret in returns:
@@ -146,9 +163,8 @@ def main():
 
     # Output to DOT
     if args.dot:
-        print('Writing to cfg.dot...')
+        logging.info('Writing CFG to cfg.dot')
         write_dot(cfg, 'cfg.dot')
-        print()
 
     # Depending on how the target was compiled and the CFGToJSON pass run, there
     # may be multiple entry points (e.g., multiple driver programs, each with
@@ -162,8 +178,8 @@ def main():
                                  cfg_dict[entry_mod][entry_func]['entry'])
 
         if entry_node not in cfg:
-            print('Entry point `%s` does not exist in the CFG. Skipping...\n' \
-                % entry_node)
+            logging.warn('Entry point `%s` does not exist in the CFG. '
+                         'Skipping...', entry_node)
             continue
 
         descendants = nx.descendants(cfg, entry_node)
@@ -176,12 +192,12 @@ def main():
         num_indirect_calls = get_num_indirect_calls(reachable_cfg)
         eccentricity = nx.eccentricity(reachable_cfg, v=entry_node)
 
+        print()
         print('`%s.%s` stats' % (entry_mod, entry_func))
         print('  num. basic blocks: %d' % num_bbs)
         print('  num. edges: %d' % num_edges)
         print('  num. indirect calls: %d' % num_indirect_calls)
         print('  eccentricity from `%s`: %d' % (entry_node, eccentricity))
-        print()
 
 
 if __name__ == '__main__':
