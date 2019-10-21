@@ -133,7 +133,8 @@ bool CFGToJSON::runOnFunction(Function &F) {
 
   StringRef ModName = sys::path::filename(M->getName());
   std::string Filename = ("cfg." + ModName + "." + F.getName() + ".json").str();
-  errs() << "Writing '" << Filename << "'...";
+  errs() << "Writing function '" << F.getName() << "' (module '" << M->getName()
+         << "') to '" << Filename << "'...";
 
   std::error_code EC;
   raw_fd_ostream File(Filename, EC, sys::fs::F_Text);
