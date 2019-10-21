@@ -20,11 +20,17 @@ CC=clang CXX=clang++ cmake ..
 clang -fplugin=/path/to/build/libLLVMCFGToJSON.so /path/to/src.c
 ```
 
-If using autotools/cmake/etc., do
+If using autotools/make/etc., do
 
 ```bash
-CFLAGS="-fplugin=/path/to/build/libLLVMCFGToJSON.so"
-CXXFLAGS="-fplugin=/path/to/build/libLLVMCFGToJSON.so"
+CFLAGS="-fplugin=/path/to/build/libLLVMCFGToJSON.so" CXXFLAGS="-fplugin=/path/to/build/libLLVMCFGToJSON.so" ./configure
+make
+```
+
+Or CMake:
+
+```bash
+cmake -DCMAKE_C_FLAGS="-fplugin=/path/to/build/libLLVMCFGToJSON.so" -DCMAKE_CXX_FLAGS="-fplugin=/path/to/build/libLLVMCFGToJSON.so" ...
 make
 ```
 
