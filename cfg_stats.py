@@ -55,9 +55,23 @@ def find_callee(cfg_dict, callee_func):
 
 
 def get_num_indirect_calls(graph):
-    indirect_call_counts = [count for _, count in
-                            graph.nodes(data='indirect_calls') if count]
+    indirect_call_counts = (count for _, count in
+                            graph.nodes(data='indirect_calls') if count)
     return sum(indirect_call_counts)
+
+
+def get_longest_path(graph, node):
+    #
+    # Algorithm:
+    #
+    #  1. Get a list of nodes that don't have any out-going edges ("sinks")
+    #  2. Get a list of loop-free paths from the entry node to every sink
+    #  3. Get the length of the maximum path from the entry node to a sink
+    #
+    sinks = (n for n, out_degree in graph.out_degree() if out_degree == 0)
+    sink_paths = (path for sink in sinks
+                  for path in nx.all_simple_paths(graph, node, sink))
+    return len(max(sink_paths, key=lambda p: len(p))) + 1
 
 
 def main():
@@ -191,6 +205,7 @@ def main():
         num_edges = reachable_cfg.size()
         num_indirect_calls = get_num_indirect_calls(reachable_cfg)
         eccentricity = nx.eccentricity(reachable_cfg, v=entry_node)
+        longest_path = get_longest_path(reachable_cfg, entry_node)
 
         print()
         print('`%s.%s` stats' % (entry_mod, entry_func))
@@ -198,6 +213,7 @@ def main():
         print('  num. edges: %d' % num_edges)
         print('  num. indirect calls: %d' % num_indirect_calls)
         print('  eccentricity from `%s`: %d' % (entry_node, eccentricity))
+        print('  longest path from `%s`: %s' % (entry_node, longest_path))
 
 
 if __name__ == '__main__':
