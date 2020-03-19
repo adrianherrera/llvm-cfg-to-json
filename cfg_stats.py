@@ -36,6 +36,8 @@ def parse_args():
                         choices={'debug', 'info', 'warning', 'error',
                                  'critical'}, dest='loglevel',
                         help='Logging level')
+    parser.add_argument('-s', '--stats', action='store_true', default=False,
+                        help='Print statistics at the end')
 
     return parser.parse_args()
 
@@ -179,6 +181,9 @@ def main():
     if args.dot:
         logging.info('Writing CFG to cfg.dot')
         write_dot(cfg, 'cfg.dot')
+
+    if not args.stats:
+        return
 
     # Depending on how the target was compiled and the CFGToJSON pass run, there
     # may be multiple entry points (e.g., multiple driver programs, each with
