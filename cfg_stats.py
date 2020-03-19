@@ -130,8 +130,8 @@ def main():
             for edge in edges:
                 src = create_node(mod, func, edge['src'])
                 cfg.add_edge(src, create_node(mod, func, edge['dst']))
-                cfg.node[src]['module'] = mod
-                cfg.node[src]['function'] = func
+                cfg.nodes[src]['module'] = mod
+                cfg.nodes[src]['function'] = func
 
             # Add interprocedural edges
             calls = func_dict.get('calls')
@@ -173,7 +173,7 @@ def main():
                 node = create_node(mod, func, n)
                 if node not in cfg:
                     cfg.add_node(node)
-                cfg.node[node]['indirect_calls'] = indirect_call_count[n]
+                cfg.nodes[node]['indirect_calls'] = indirect_call_count[n]
 
     # Output to DOT
     if args.dot:
