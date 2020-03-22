@@ -9,15 +9,14 @@
 from __future__ import print_function
 
 import argparse
-from collections import defaultdict, Counter
-import glob
 import logging
-import json
 import os
 
 import networkx as nx
 from networkx.drawing.nx_pydot import write_dot
 import pydot
+
+from llvm_cfg import create_cfg
 
 
 def parse_args():
@@ -42,20 +41,6 @@ def parse_args():
     return parser.parse_args()
 
 
-def create_node(mod, func, identifier):
-    return '%s.%s.%s' % (mod, func, identifier)
-
-
-def find_callee(cfg_dict, callee_func):
-    # TODO optimize
-    for mod_dict in cfg_dict.values():
-        for func, func_dict in mod_dict.items():
-            if callee_func == func:
-                return func_dict
-
-    return {}
-
-
 def get_num_indirect_calls(graph):
     indirect_call_counts = (count for _, count in
                             graph.nodes(data='indirect_calls') if count)
@@ -73,7 +58,7 @@ def get_longest_path(graph, node):
     sinks = (n for n, out_degree in graph.out_degree() if out_degree == 0)
     sink_paths = (path for sink in sinks
                   for path in nx.all_simple_paths(graph, node, sink))
-    return len(max(sink_paths, key=lambda p: len(p))) + 1
+    return len(max(sink_paths, key=len)) + 1
 
 
 def main():
@@ -91,91 +76,7 @@ def main():
     logging.basicConfig(level=numeric_log_level)
 
     # Load all of the control flow graphs (CFG)
-
-    cfg_dict = defaultdict(dict)
-    entry_pts = []
-
-    for json_path in glob.glob(os.path.join(json_dir, 'cfg.*.json')):
-        logging.debug('Parsing `%s`', json_path)
-        with open(json_path, 'r') as json_file:
-            data = json.load(json_file)
-
-            # Build the CFG
-            mod = data['module']
-            func = data.pop('function')
-            cfg_dict[mod][func] = data
-
-            # Collect other interesting stats
-            if func == args.entry and \
-                    (args.module is None or mod == args.module):
-                logging.debug('New entry point `%s` in module %s', func, mod)
-                entry_pts.append((mod, func))
-
-    # Turn the CFGs into a networkx graph
-
-    # Blacklist the following functions
-    blacklist = set()
-
-    cfg = nx.DiGraph()
-
-    for mod, mod_dict in cfg_dict.items():
-        for func, func_dict in mod_dict.items():
-            if func in blacklist:
-                logging.info('Function `%s` is blacklisted. Skipping', func)
-                continue
-
-            # Add intraprocedural edges
-            edges = func_dict.get('edges')
-            if edges is None:
-                edges = []
-
-            for edge in edges:
-                src = create_node(mod, func, edge['src'])
-                cfg.add_edge(src, create_node(mod, func, edge['dst']))
-                cfg.nodes[src]['module'] = mod
-                cfg.nodes[src]['function'] = func
-
-            # Add interprocedural edges
-            calls = func_dict.get('calls')
-            if calls is None:
-                calls = []
-
-            for call in calls:
-                # Add forward (call) edge
-                #
-                # If we don't know anything about the callee function (such as
-                # its entry block), skip it
-                callee = call['dst']
-                callee_dict = find_callee(cfg_dict, callee)
-                if 'entry' not in callee_dict:
-                    continue
-
-                cfg.add_edge(create_node(mod, func, call['src']),
-                             create_node(callee_dict['module'], callee,
-                                         callee_dict['entry']))
-
-                # Add backward (return) edges
-                returns = callee_dict.get('returns')
-                if returns is None:
-                    logging.debug('function `%s` has no return instruction(s)',
-                                  callee)
-                    returns = []
-
-                for ret in returns:
-                    cfg.add_edge(create_node(mod, callee, ret),
-                                 create_node(mod, func, call['src']))
-
-            # Count indirect calls and assign them to the nodes that make them
-            indirect_calls = func_dict.get('indirect_calls')
-            if indirect_calls is None:
-                indirect_calls = []
-
-            indirect_call_count = Counter(indirect_calls)
-            for n in indirect_call_count:
-                node = create_node(mod, func, n)
-                if node not in cfg:
-                    cfg.add_node(node)
-                cfg.nodes[node]['indirect_calls'] = indirect_call_count[n]
+    cfg, entry_pts = create_cfg(json_dir, args.entry, args.module)
 
     # Output to DOT
     if args.dot:
@@ -192,13 +93,10 @@ def main():
     # Thus, iterate over each entry point and reduce the CFG to only those nodes
     # reachable from the entry point. This allows us to calculate eccentricity,
     # because the CFG is now connected.
-    for entry_mod, entry_func in entry_pts:
-        entry_node = create_node(entry_mod, entry_func,
-                                 cfg_dict[entry_mod][entry_func]['entry'])
-
+    for entry_node in entry_pts:
         if entry_node not in cfg:
-            logging.warn('Entry point `%s` does not exist in the CFG. '
-                         'Skipping...', entry_node)
+            logging.warning('Entry point `%s` does not exist in the CFG. '
+                            'Skipping...', entry_node)
             continue
 
         descendants = nx.descendants(cfg, entry_node)
@@ -213,7 +111,7 @@ def main():
         longest_path = get_longest_path(reachable_cfg, entry_node)
 
         print()
-        print('`%s.%s` stats' % (entry_mod, entry_func))
+        print('`%s` stats' % entry_node)
         print('  num. basic blocks: %d' % num_bbs)
         print('  num. edges: %d' % num_edges)
         print('  num. indirect calls: %d' % num_indirect_calls)
