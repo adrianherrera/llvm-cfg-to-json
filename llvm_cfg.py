@@ -13,7 +13,7 @@ import os
 import networkx as nx
 
 
-def _create_node(mod, func, identifier):
+def create_cfg_node(mod, func, identifier):
     """Create a node in the CFG."""
     return '%s.%s.%s' % (mod, func, identifier)
 
@@ -39,7 +39,7 @@ def create_cfg(json_dir, entry_point='main', entry_module=None, blacklist=None):
     2. A list of entry nodes into the CFG
     """
     cfg_dict = defaultdict(dict)
-    entry_pts = []
+    entry_nodes = []
 
     if not blacklist:
         blacklist = set()
@@ -69,7 +69,7 @@ def create_cfg(json_dir, entry_point='main', entry_module=None, blacklist=None):
                 nodes = {}
 
             for label, data in nodes.items():
-                node = _create_node(mod, func, label)
+                node = create_cfg_node(mod, func, label)
                 start_line = data['start_line']
                 end_line = data['end_line']
 
@@ -85,12 +85,12 @@ def create_cfg(json_dir, entry_point='main', entry_module=None, blacklist=None):
                 edges = []
 
             for edge in edges:
-                src = _create_node(mod, func, edge['src'])
-                cfg.add_edge(src, _create_node(mod, func, edge['dst']))
+                src = create_cfg_node(mod, func, edge['src'])
+                cfg.add_edge(src, create_cfg_node(mod, func, edge['dst']))
 
                 if func == entry_point and \
                         (entry_module is None or mod == entry_module):
-                    entry_pts.append(src)
+                    entry_nodes.append(src)
 
             # Add interprocedural edges
             calls = func_dict.get('calls')
@@ -107,8 +107,8 @@ def create_cfg(json_dir, entry_point='main', entry_module=None, blacklist=None):
                 if 'entry' not in callee_dict:
                     continue
 
-                cfg.add_edge(_create_node(mod, func, call['src']),
-                             _create_node(callee_dict['module'], callee,
+                cfg.add_edge(create_cfg_node(mod, func, call['src']),
+                             create_cfg_node(callee_dict['module'], callee,
                                           callee_dict['entry']))
 
                 # Add backward (return) edges
@@ -119,8 +119,8 @@ def create_cfg(json_dir, entry_point='main', entry_module=None, blacklist=None):
                     returns = []
 
                 for ret in returns:
-                    cfg.add_edge(_create_node(mod, callee, ret),
-                                 _create_node(mod, func, call['src']))
+                    cfg.add_edge(create_cfg_node(mod, callee, ret),
+                                 create_cfg_node(mod, func, call['src']))
 
             # Count indirect calls and assign them to the nodes that make them
             indirect_calls = func_dict.get('indirect_calls')
@@ -129,9 +129,9 @@ def create_cfg(json_dir, entry_point='main', entry_module=None, blacklist=None):
 
             indirect_call_count = Counter(indirect_calls)
             for n in indirect_call_count:
-                node = _create_node(mod, func, n)
+                node = create_cfg_node(mod, func, n)
                 if node not in cfg:
                     cfg.add_node(node)
                 cfg.nodes[node]['indirect_calls'] = indirect_call_count[n]
 
-    return cfg, entry_pts
+    return cfg, entry_nodes
