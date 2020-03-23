@@ -1,14 +1,16 @@
 #!/usr/bin/env python
-#
-# Author: Adrian Herrera
-#
-# Calculate useful statistics of an LLVM control flow graph
-#
+
+"""
+Example script that uses the LLVM CFG to calculate useful statistics of an LLVM
+control-flow graph.
+
+Author: Adrian Herrera
+"""
 
 
 from __future__ import print_function
 
-import argparse
+from argparse import ArgumentParser
 import logging
 import os
 
@@ -20,8 +22,8 @@ from llvm_cfg import create_cfg
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Calculate statistics of an '
-                                                 'LLVM CFG')
+    """Parse command-line arguments."""
+    parser = ArgumentParser(description='Calculate statistics of an LLVM CFG')
     parser.add_argument('json_dir',
                         help='Path to directory containing JSON CFGs')
     parser.add_argument('--dot', action='store_true', required=False,
@@ -62,6 +64,7 @@ def get_longest_path(graph, node):
 
 
 def main():
+    """The main function."""
     args = parse_args()
 
     # Check that the input directory is valid

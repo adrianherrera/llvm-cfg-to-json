@@ -1,3 +1,9 @@
+"""
+Generate networkx-based control-flow graph based on the LLVM `CFGToJSON` pass.
+
+Author: Adrian Herrera
+"""
+
 from collections import defaultdict, Counter
 import glob
 import json
@@ -26,6 +32,11 @@ def create_cfg(json_dir, entry_point='main', entry_module=None, blacklist=None):
     """
     Create an interprocedural control-flow graph from a directory of JSON files
     created by the `CFGToJSON` LLVM pass.
+
+    Returns a tuple containing:
+
+    1. The CFG
+    2. A list of entry nodes into the CFG
     """
     cfg_dict = defaultdict(dict)
     entry_pts = []
@@ -52,6 +63,17 @@ def create_cfg(json_dir, entry_point='main', entry_module=None, blacklist=None):
                 logging.info('Function `%s` is blacklisted. Skipping', func)
                 continue
 
+            # Add nodes
+            nodes = func_dict.get('nodes')
+            if nodes is None:
+                nodes = {}
+
+            for label, data in nodes.items():
+                node = _create_node(mod, func, label)
+                cfg.add_node(node, module=mod, function=func,
+                             start_line=data['start_line'],
+                             end_line=data['end_line'])
+
             # Add intraprocedural edges
             edges = func_dict.get('edges')
             if edges is None:
@@ -60,8 +82,6 @@ def create_cfg(json_dir, entry_point='main', entry_module=None, blacklist=None):
             for edge in edges:
                 src = _create_node(mod, func, edge['src'])
                 cfg.add_edge(src, _create_node(mod, func, edge['dst']))
-                cfg.nodes[src]['module'] = mod
-                cfg.nodes[src]['function'] = func
 
                 if func == entry_point and \
                         (entry_module is None or mod == entry_module):

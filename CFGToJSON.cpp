@@ -58,6 +58,25 @@ static std::string getBBLabel(const BasicBlock *BB) {
   return OS.str();
 }
 
+static std::pair<unsigned, unsigned> getSourceRange(const BasicBlock *BB) {
+  unsigned StartLine = 0;
+  for (const auto &I : *BB) {
+    const DebugLoc &DbgLoc = I.getDebugLoc();
+    if (DbgLoc) {
+      StartLine = DbgLoc.getLine();
+      break;
+    }
+  }
+
+  unsigned EndLine = 0;
+  const DebugLoc &TermDbgLoc = BB->getTerminator()->getDebugLoc();
+  if (TermDbgLoc) {
+    EndLine = TermDbgLoc.getLine();
+  }
+
+  return {StartLine, EndLine};
+}
+
 void CFGToJSON::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesAll();
 }
@@ -85,7 +104,12 @@ bool CFGToJSON::runOnFunction(Function &F) {
 
     // Save the node
     auto BBLabel = getBBLabel(BB);
-    JNodes.append(BBLabel);
+    auto SourceRange = getSourceRange(BB);
+
+    Json::Value BBNode;
+    BBNode["start_line"] = SourceRange.first;
+    BBNode["end_line"] = SourceRange.second;
+    JNodes[BBLabel] = BBNode;
 
     // Save the edges
     for (auto SI = succ_begin(BB), SE = succ_end(BB); SI != SE; ++SI) {
