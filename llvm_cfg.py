@@ -39,7 +39,7 @@ def create_cfg(json_dir, entry_point='main', entry_module=None, blacklist=None):
     2. A list of entry nodes into the CFG
     """
     cfg_dict = defaultdict(dict)
-    entry_nodes = []
+    entry_nodes = set()
 
     if not blacklist:
         blacklist = set()
@@ -91,7 +91,7 @@ def create_cfg(json_dir, entry_point='main', entry_module=None, blacklist=None):
                 if func == entry_point and \
                         (entry_module is None or mod == entry_module) and \
                         cfg.in_degree(src) == 0:
-                    entry_nodes.append(src)
+                    entry_nodes.add(src)
 
             # Add interprocedural edges
             calls = func_dict.get('calls')
@@ -135,4 +135,4 @@ def create_cfg(json_dir, entry_point='main', entry_module=None, blacklist=None):
                     cfg.add_node(node)
                 cfg.nodes[node]['indirect_calls'] = indirect_call_count[n]
 
-    return cfg, entry_nodes
+    return cfg, list(entry_nodes)
