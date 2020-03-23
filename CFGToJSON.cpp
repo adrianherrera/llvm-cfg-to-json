@@ -101,8 +101,10 @@ bool CFGToJSON::runOnFunction(Function &F) {
     auto SourceRange = getSourceRange(BB);
 
     Json::Value BBNode;
-    BBNode["start_line"] = SourceRange.first ? SourceRange.first.getLine() : -1;
-    BBNode["end_line"] = SourceRange.second ? SourceRange.second.getLine() : -1;
+    BBNode["start_line"] =
+        (int)(SourceRange.first ? SourceRange.first.getLine() : -1);
+    BBNode["end_line"] =
+        (int)(SourceRange.second ? SourceRange.second.getLine() : -1);
     JNodes[BBLabel] = BBNode;
 
     // Save the edges
