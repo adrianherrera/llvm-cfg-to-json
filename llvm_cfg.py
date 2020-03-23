@@ -89,7 +89,8 @@ def create_cfg(json_dir, entry_point='main', entry_module=None, blacklist=None):
                 cfg.add_edge(src, create_cfg_node(mod, func, edge['dst']))
 
                 if func == entry_point and \
-                        (entry_module is None or mod == entry_module):
+                        (entry_module is None or mod == entry_module) and \
+                        cfg.in_degree(src) == 0:
                     entry_nodes.append(src)
 
             # Add interprocedural edges
