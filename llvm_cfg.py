@@ -28,7 +28,8 @@ def _find_callee(cfg_dict, callee_func):
     return {}
 
 
-def create_cfg(json_dir, entry_point='main', entry_module=None, blacklist=None):
+def create_cfg(json_dirs, entry_point='main', entry_module=None,
+               blacklist=None):
     """
     Create an interprocedural control-flow graph from a directory of JSON files
     created by the `CFGToJSON` LLVM pass.
@@ -44,15 +45,19 @@ def create_cfg(json_dir, entry_point='main', entry_module=None, blacklist=None):
     if not blacklist:
         blacklist = set()
 
-    for json_path in glob.glob(os.path.join(json_dir, 'cfg.*.json')):
-        logging.debug('Parsing `%s`', json_path)
-        with open(json_path, 'r') as json_file:
-            data = json.load(json_file)
+    for json_dir in json_dirs:
+        if not os.path.isdir(json_dir):
+            raise Exception('Invalid JSON directory `%s`' % json_dir)
 
-            # Build the CFG dictionary
-            mod = data['module']
-            func = data.pop('function')
-            cfg_dict[mod][func] = data
+        for json_path in glob.glob(os.path.join(json_dir, 'cfg.*.json')):
+            logging.debug('Parsing `%s`', json_path)
+            with open(json_path, 'r') as json_file:
+                data = json.load(json_file)
+
+                # Build the CFG dictionary
+                mod = data['module']
+                func = data.pop('function')
+                cfg_dict[mod][func] = data
 
     # Turn the CFGs into a networkx graph
     cfg = nx.DiGraph()

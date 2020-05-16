@@ -24,8 +24,6 @@ from llvm_cfg import create_cfg
 def parse_args():
     """Parse command-line arguments."""
     parser = ArgumentParser(description='Calculate statistics of an LLVM CFG')
-    parser.add_argument('json_dir',
-                        help='Path to directory containing JSON CFGs')
     parser.add_argument('--dot', action='store_true', required=False,
                         help='Generate DOT file')
     parser.add_argument('-e', '--entry', action='store', required=False,
@@ -39,6 +37,8 @@ def parse_args():
                         help='Logging level')
     parser.add_argument('-s', '--stats', action='store_true', default=False,
                         help='Print statistics at the end')
+    parser.add_argument('json_dirs', nargs='+',
+                        help='Path(s) to directory containing JSON CFGs')
 
     return parser.parse_args()
 
@@ -67,11 +67,6 @@ def main():
     """The main function."""
     args = parse_args()
 
-    # Check that the input directory is valid
-    json_dir = args.json_dir
-    if not os.path.isdir(json_dir):
-        raise Exception('Invalid JSON directory `%s`' % json_dir)
-
     # Set the logging level
     numeric_log_level = getattr(logging, args.loglevel.upper(), None)
     if not isinstance(numeric_log_level, int):
@@ -79,7 +74,7 @@ def main():
     logging.basicConfig(level=numeric_log_level)
 
     # Load all of the control flow graphs (CFG)
-    cfg, entry_pts = create_cfg(json_dir, args.entry, args.module)
+    cfg, entry_pts = create_cfg(args.json_dirs, args.entry, args.module)
 
     # Output to DOT
     if args.dot:
