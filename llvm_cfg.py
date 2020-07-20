@@ -65,8 +65,10 @@ def create_cfg(json_dirs, entry_point='main', entry_module=None,
     for mod, mod_dict in cfg_dict.items():
         for func, func_dict in mod_dict.items():
             if func in blacklist:
-                logging.info('Function `%s` is blacklisted. Skipping', func)
+                logging.info('Function `%s` (in %s) is blacklisted. Skipping',
+                             func, func_dict['module'])
                 continue
+            logging.debug('Processing `%s` (in %s)', func, func_dict['module'])
 
             # Add nodes
             nodes = func_dict.get('nodes')
@@ -83,20 +85,20 @@ def create_cfg(json_dirs, entry_point='main', entry_module=None,
                     cfg.nodes[node]['start_line'] = start_line
                     cfg.nodes[node]['end_line'] = end_line
 
-
             # Add intraprocedural edges
             edges = func_dict.get('edges')
             if edges is None:
                 edges = []
 
             for edge in edges:
-                src = create_cfg_node(mod, func, edge['src'])
-                cfg.add_edge(src, create_cfg_node(mod, func, edge['dst']))
+                src_node = create_cfg_node(mod, func, edge['src'])
+                dst_node = create_cfg_node(mod, func, edge['dst'])
+                cfg.add_edge(src_node, dst_node)
 
                 if func == entry_point and \
                         (entry_module is None or mod == entry_module) and \
-                        cfg.in_degree(src) == 0:
-                    entry_nodes.add(src)
+                        cfg.in_degree(src_node) == 0:
+                    entry_nodes.add(src_node)
 
             # Add interprocedural edges
             calls = func_dict.get('calls')
@@ -108,25 +110,36 @@ def create_cfg(json_dirs, entry_point='main', entry_module=None,
                 #
                 # If we don't know anything about the callee function (such as
                 # its entry block), skip it
+                caller = call['src']
                 callee = call['dst']
                 callee_dict = _find_callee(cfg_dict, callee)
                 if 'entry' not in callee_dict:
+                    logging.debug('Skipping call to `%s` (from `%s`)', callee,
+                                  caller)
                     continue
 
-                cfg.add_edge(create_cfg_node(mod, func, call['src']),
-                             create_cfg_node(callee_dict['module'], callee,
-                                          callee_dict['entry']))
+                src_node = create_cfg_node(mod, func, caller)
+                dst_node = create_cfg_node(callee_dict['module'], callee,
+                                           callee_dict['entry'])
+                cfg.add_edge(src_node, dst_node)
+
+                if func == entry_point and \
+                        (entry_module is None or mod == entry_module) and \
+                        cfg.in_degree(src_node) == 0:
+                    entry_nodes.add(src_node)
 
                 # Add backward (return) edges
                 returns = callee_dict.get('returns')
                 if returns is None:
-                    logging.debug('function `%s` has no return instruction(s)',
-                                  callee)
+                    logging.debug('function `%s` (in %s) has no return '
+                                  'instruction(s)', callee,
+                                  callee_dict['module'])
                     returns = []
 
                 for ret in returns:
-                    cfg.add_edge(create_cfg_node(mod, callee, ret),
-                                 create_cfg_node(mod, func, call['src']))
+                    src_node = create_cfg_node(mod, callee, ret)
+                    dst_node = create_cfg_node(mod, func, call['src'])
+                    cfg.add_edge(src_node, dst_node)
 
             # Count indirect calls and assign them to the nodes that make them
             indirect_calls = func_dict.get('indirect_calls')
