@@ -24,8 +24,8 @@ from llvm_cfg import create_cfg
 def parse_args():
     """Parse command-line arguments."""
     parser = ArgumentParser(description='Calculate statistics of an LLVM CFG')
-    parser.add_argument('--dot', action='store_true', required=False,
-                        help='Generate DOT file')
+    parser.add_argument('--dot', action='store', default='cfg.dot',
+                        help='Generate DOT file at the given path')
     parser.add_argument('-e', '--entry', action='store', required=False,
                         default='main',
                         help='Program entry point (function name)')
@@ -77,9 +77,9 @@ def main():
     cfg, entry_pts = create_cfg(args.json_dirs, args.entry, args.module)
 
     # Output to DOT
-    if args.dot:
-        logging.info('Writing CFG to cfg.dot')
-        write_dot(cfg, 'cfg.dot')
+    dot_path = args.dot
+    logging.info('Writing CFG to %s' % dot_path)
+    write_dot(cfg, dot_path)
 
     if not args.stats:
         return
