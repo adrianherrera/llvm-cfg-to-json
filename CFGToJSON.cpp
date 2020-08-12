@@ -71,6 +71,14 @@ static std::pair<DebugLoc, DebugLoc> getSourceRange(const BasicBlock *BB) {
   return {Start, BB->getTerminator()->getDebugLoc()};
 }
 
+static filter_iterator<
+    BasicBlock::const_iterator,
+    std::function<bool(const Instruction &)>>::difference_type
+sizeWithoutDebug(const BasicBlock *BB) {
+  return std::distance(BB->instructionsWithoutDebug().begin(),
+                       BB->instructionsWithoutDebug().end());
+}
+
 void CFGToJSON::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesAll();
 }
@@ -105,6 +113,7 @@ bool CFGToJSON::runOnFunction(Function &F) {
         SourceRange.first ? SourceRange.first.getLine() : Json::Value();
     BBNode["end_line"] =
         SourceRange.second ? SourceRange.second.getLine() : Json::Value();
+    BBNode["size"] = sizeWithoutDebug(BB);
     JNodes[BBLabel] = BBNode;
 
     // Save the edges

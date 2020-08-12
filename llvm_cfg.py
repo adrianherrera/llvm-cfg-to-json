@@ -79,11 +79,13 @@ def create_cfg(json_dirs, entry_point='main', entry_module=None,
                 node = create_cfg_node(mod, func, label)
                 start_line = data['start_line']
                 end_line = data['end_line']
+                size = data['size']
 
                 cfg.add_node(node, module=mod, function=func)
                 if start_line and end_line:
                     cfg.nodes[node]['start_line'] = start_line
                     cfg.nodes[node]['end_line'] = end_line
+                    cfg.nodes[node]['size'] = size
 
             # Add intraprocedural edges
             edges = func_dict.get('edges')
