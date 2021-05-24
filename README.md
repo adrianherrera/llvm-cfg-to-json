@@ -51,5 +51,5 @@ produce a DOT graph of the CFG.
 
 ```bash
 clang -fplugin=/path/to/build/libLLVMCFGToJSON.so /path/to/src.c
-python cfg_stats.py `pwd`
+python cfg_stats.py `pwd`/cfg.*.json
 ```

@@ -4,21 +4,25 @@ Generate networkx-based control-flow graph based on the LLVM `CFGToJSON` pass.
 Author: Adrian Herrera
 """
 
+
+__all__ = ['create_cfg']
+
+
 from collections import defaultdict, Counter
-import glob
+from pathlib import Path
+from typing import Optional, Sequence, Set, Tuple
 import json
 import logging
-import os
 
 import networkx as nx
 
 
-def create_cfg_node(mod, func, identifier):
+def create_cfg_node(mod: str, func: str, identifier: str) -> str:
     """Create a node in the CFG."""
-    return '%s.%s.%s' % (mod, func, identifier)
+    return f'{mod}.{func}.{identifier}'
 
 
-def _find_callee(cfg_dict, callee_func):
+def find_callee(cfg_dict: dict, callee_func: str) -> dict:
     # TODO optimize
     for mod_dict in cfg_dict.values():
         for func, func_dict in mod_dict.items():
@@ -28,8 +32,9 @@ def _find_callee(cfg_dict, callee_func):
     return {}
 
 
-def create_cfg(json_dirs, entry_point='main', entry_module=None,
-               blacklist=None):
+def create_cfg(jsons: Sequence[Path], entry_point: str = 'main',
+               entry_module: Optional[str] = None,
+               blacklist: Optional[Set[str]] = None) -> Tuple[nx.DiGraph, Set[str]]:
     """
     Create an interprocedural control-flow graph from a directory of JSON files
     created by the `CFGToJSON` LLVM pass.
@@ -45,19 +50,19 @@ def create_cfg(json_dirs, entry_point='main', entry_module=None,
     if not blacklist:
         blacklist = set()
 
-    for json_dir in json_dirs:
-        if not os.path.isdir(json_dir):
-            raise Exception('Invalid JSON directory `%s`' % json_dir)
+    for json_path in jsons:
+        if not json_path.is_file():
+            logging.warning('`%s` is not a file. Skipping', json_path)
+            continue
 
-        for json_path in glob.glob(os.path.join(json_dir, 'cfg.*.json')):
-            logging.debug('Parsing `%s`', json_path)
-            with open(json_path, 'r') as json_file:
-                data = json.load(json_file)
+        logging.debug('Parsing `%s`', json_path)
+        with json_path.open() as inf:
+            data = json.load(inf)
 
-                # Build the CFG dictionary
-                mod = data['module']
-                func = data.pop('function')
-                cfg_dict[mod][func] = data
+        # Build the CFG dictionary
+        mod = data['module']
+        func = data.pop('function')
+        cfg_dict[mod][func] = data
 
     # Turn the CFGs into a networkx graph
     cfg = nx.DiGraph()
@@ -114,10 +119,10 @@ def create_cfg(json_dirs, entry_point='main', entry_module=None,
                 # its entry block), skip it
                 caller = call['src']
                 callee = call['dst']
-                callee_dict = _find_callee(cfg_dict, callee)
+                callee_dict = find_callee(cfg_dict, callee)
                 if 'entry' not in callee_dict:
-                    logging.debug('Skipping call to `%s` (from `%s`)', callee,
-                                  caller)
+                    logging.debug('Callee `%s` (called from `%s`) is external. '
+                                  'Skipping', callee, caller)
                     continue
 
                 src_node = create_cfg_node(mod, func, caller)
@@ -133,7 +138,7 @@ def create_cfg(json_dirs, entry_point='main', entry_module=None,
                 # Add backward (return) edges
                 returns = callee_dict.get('returns')
                 if returns is None:
-                    logging.debug('function `%s` (in %s) has no return '
+                    logging.debug('Function `%s` (in %s) has no return '
                                   'instruction(s)', callee,
                                   callee_dict['module'])
                     returns = []

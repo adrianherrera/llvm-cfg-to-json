@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 Example script that uses the LLVM CFG to calculate useful statistics of an LLVM
@@ -10,18 +10,17 @@ Author: Adrian Herrera
 
 from __future__ import print_function
 
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
+from pathlib import Path
 import logging
-import os
 
 import networkx as nx
 from networkx.drawing.nx_pydot import write_dot
-import pydot
 
 from llvm_cfg import create_cfg
 
 
-def parse_args():
+def parse_args() -> Namespace:
     """Parse command-line arguments."""
     parser = ArgumentParser(description='Calculate statistics of an LLVM CFG')
     parser.add_argument('--dot', action='store', default='cfg.dot',
@@ -37,19 +36,19 @@ def parse_args():
                         help='Logging level')
     parser.add_argument('-s', '--stats', action='store_true', default=False,
                         help='Print statistics at the end')
-    parser.add_argument('json_dirs', nargs='+',
-                        help='Path(s) to directory containing JSON CFGs')
+    parser.add_argument('jsons', nargs='+', type=Path, metavar='JSON',
+                        help='Path(s) to JSON CFG files')
 
     return parser.parse_args()
 
 
-def get_num_indirect_calls(graph):
+def get_num_indirect_calls(graph: nx.DiGraph) -> int:
     indirect_call_counts = (count for _, count in
                             graph.nodes(data='indirect_calls') if count)
     return sum(indirect_call_counts)
 
 
-def get_longest_path(graph, node):
+def get_longest_path(graph: nx.DiGraph, node: str) -> int:
     #
     # Algorithm:
     #
@@ -71,14 +70,15 @@ def main():
     numeric_log_level = getattr(logging, args.loglevel.upper(), None)
     if not isinstance(numeric_log_level, int):
         raise ValueError('Invalid log level: %s' % args.loglevel)
-    logging.basicConfig(level=numeric_log_level)
+    logging.basicConfig(level=numeric_log_level,
+                        format='[%(asctime)s] %(levelname)s: %(message)s')
 
     # Load all of the control flow graphs (CFG)
-    cfg, entry_pts = create_cfg(args.json_dirs, args.entry, args.module)
+    cfg, entry_pts = create_cfg(args.jsons, args.entry, args.module)
 
     # Output to DOT
     dot_path = args.dot
-    logging.info('Writing CFG to %s' % dot_path)
+    logging.info('Writing CFG to %s', dot_path)
     write_dot(cfg, dot_path)
 
     if not args.stats:
