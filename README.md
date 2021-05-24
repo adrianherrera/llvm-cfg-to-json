@@ -9,8 +9,14 @@ procedural edges (i.e., function calls).
 ```bash
 git clone https://github.com/adrianherrera/llvm-cfg-to-json.git
 cd llvm-cfg-to-json
+
 mkdir build
 cd build
+
+# If you have multiple LLVM versions installed, specify the one you want by
+# setting LLVM_DIR; e.g., -DLLVM_DIR=/usr/lib/llvm-10/lib/cmake/llvm
+#
+# This probably also requires setting CC/CXX
 CC=clang CXX=clang++ cmake ..
 ```
 
