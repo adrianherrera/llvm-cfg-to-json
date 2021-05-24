@@ -61,7 +61,7 @@ static std::string getBBLabel(const BasicBlock *BB) {
 static std::pair<DebugLoc, DebugLoc> getSourceRange(const BasicBlock *BB) {
   DebugLoc Start;
   for (const auto &I : *BB) {
-    const DebugLoc &DbgLoc = I.getDebugLoc();
+    const auto &DbgLoc = I.getDebugLoc();
     if (DbgLoc) {
       Start = DbgLoc;
       break;
@@ -99,20 +99,18 @@ bool CFGToJSON::runOnFunction(Function &F) {
     auto *BB = Worklist.pop_back_val();
 
     // Prevent loops
-    auto Res = SeenBBs.insert(BB);
+    const auto Res = SeenBBs.insert(BB);
     if (!Res.second) {
       continue;
     }
 
     // Save the node
-    auto BBLabel = getBBLabel(BB);
-    auto SourceRange = getSourceRange(BB);
+    const auto &BBLabel = getBBLabel(BB);
+    const auto &[SrcStart, SrcEnd] = getSourceRange(BB);
 
     Json::Value BBNode;
-    BBNode["start_line"] =
-        SourceRange.first ? SourceRange.first.getLine() : Json::Value();
-    BBNode["end_line"] =
-        SourceRange.second ? SourceRange.second.getLine() : Json::Value();
+    BBNode["start_line"] = SrcStart ? SrcStart.getLine() : Json::Value();
+    BBNode["end_line"] = SrcEnd ? SrcEnd.getLine() : Json::Value();
     BBNode["size"] = sizeWithoutDebug(BB);
     JNodes[BBLabel] = BBNode;
 
