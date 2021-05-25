@@ -128,7 +128,8 @@ bool CFGToJSON::runOnFunction(Function &F) {
     for (auto &I : *BB) {
       if ((isa<CallInst>(I) && !isa<IntrinsicInst>(I)) || isa<InvokeInst>(I)) {
         CallSite CS(&I);
-        auto *CalledF = CS.getCalledFunction();
+        auto *CalledF = dyn_cast_or_null<Function>(
+            CS.getCalledValue()->stripPointerCasts());
         if (CalledF) {
           Json::Value JCall;
           JCall["src"] = BBLabel;
