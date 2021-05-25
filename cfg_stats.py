@@ -8,10 +8,9 @@ Author: Adrian Herrera
 """
 
 
-from __future__ import print_function
-
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
+from typing import Optional
 import logging
 
 import networkx as nx
@@ -43,12 +42,14 @@ def parse_args() -> Namespace:
 
 
 def get_num_indirect_calls(graph: nx.DiGraph) -> int:
+    """Determine the number of indirect function calls in the CFG."""
     indirect_call_counts = (count for _, count in
                             graph.nodes(data='indirect_calls') if count)
     return sum(indirect_call_counts)
 
 
 def get_longest_path(graph: nx.DiGraph, node: str) -> int:
+    """Determine the length of the longest path in the CFG."""
     #
     # Algorithm:
     #
@@ -60,6 +61,42 @@ def get_longest_path(graph: nx.DiGraph, node: str) -> int:
     sink_paths = (path for sink in sinks
                   for path in nx.all_simple_paths(graph, node, sink))
     return len(max(sink_paths, key=len)) + 1
+
+
+def print_stats(cfg: nx.DiGraph, entry_node: Optional[str] = None) -> None:
+    """Print CFG statistics."""
+    if entry_node and entry_node not in cfg:
+        logging.warning('Entry point %s does not exist in the CFG. '
+                        'Skipping...', entry_node)
+        return
+
+    if entry_node:
+        descendants = nx.descendants(cfg, entry_node)
+        descendants.add(entry_node)
+        reachable_cfg = cfg.copy()
+        reachable_cfg.remove_nodes_from(n for n in cfg if n not in descendants)
+    else:
+        reachable_cfg = cfg
+
+    print()
+    if entry_node:
+        print('%s stats' % entry_node)
+
+    num_bbs = reachable_cfg.number_of_nodes()
+    print('  num. basic blocks: %d' % num_bbs)
+
+    num_edges = reachable_cfg.size()
+    print('  num. edges: %d' % num_edges)
+
+    num_indirect_calls = get_num_indirect_calls(reachable_cfg)
+    print('  num. indirect calls: %d' % num_indirect_calls)
+
+    if entry_node:
+        eccentricity = nx.eccentricity(reachable_cfg, v=entry_node)
+        print('  eccentricity: %d' % eccentricity)
+
+        longest_path = get_longest_path(reachable_cfg, entry_node)
+        print('  longest path from %s: %s' % (entry_node, longest_path))
 
 
 def main():
@@ -91,30 +128,11 @@ def main():
     # Thus, iterate over each entry point and reduce the CFG to only those nodes
     # reachable from the entry point. This allows us to calculate eccentricity,
     # because the CFG is now connected.
-    for entry_node in entry_pts:
-        if entry_node not in cfg:
-            logging.warning('Entry point `%s` does not exist in the CFG. '
-                            'Skipping...', entry_node)
-            continue
-
-        descendants = nx.descendants(cfg, entry_node)
-        descendants.add(entry_node)
-        reachable_cfg = cfg.copy()
-        reachable_cfg.remove_nodes_from(n for n in cfg if n not in descendants)
-
-        num_bbs = reachable_cfg.number_of_nodes()
-        num_edges = reachable_cfg.size()
-        num_indirect_calls = get_num_indirect_calls(reachable_cfg)
-        eccentricity = nx.eccentricity(reachable_cfg, v=entry_node)
-        longest_path = get_longest_path(reachable_cfg, entry_node)
-
-        print()
-        print('`%s` stats' % entry_node)
-        print('  num. basic blocks: %d' % num_bbs)
-        print('  num. edges: %d' % num_edges)
-        print('  num. indirect calls: %d' % num_indirect_calls)
-        print('  eccentricity from `%s`: %d' % (entry_node, eccentricity))
-        print('  longest path from `%s`: %s' % (entry_node, longest_path))
+    if not entry_pts:
+        print_stats(cfg)
+    else:
+        for entry_node in entry_pts:
+            print_stats(cfg, entry_node)
 
 
 if __name__ == '__main__':

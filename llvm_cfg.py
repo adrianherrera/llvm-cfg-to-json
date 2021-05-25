@@ -52,10 +52,10 @@ def create_cfg(jsons: Sequence[Path], entry_point: str = 'main',
 
     for json_path in jsons:
         if not json_path.is_file():
-            logging.warning('`%s` is not a file. Skipping', json_path)
+            logging.warning('%s is not a file. Skipping...', json_path)
             continue
 
-        logging.debug('Parsing `%s`', json_path)
+        logging.debug('Parsing %s', json_path)
         with json_path.open() as inf:
             data = json.load(inf)
 
@@ -70,10 +70,10 @@ def create_cfg(jsons: Sequence[Path], entry_point: str = 'main',
     for mod, mod_dict in cfg_dict.items():
         for func, func_dict in mod_dict.items():
             if func in blacklist:
-                logging.info('Function `%s` (in %s) is blacklisted. Skipping',
-                             func, func_dict['module'])
+                logging.info('Function %s (in %s) is blacklisted. '
+                             'Skipping...', func, func_dict['module'])
                 continue
-            logging.debug('Processing `%s` (in %s)', func, func_dict['module'])
+            logging.debug('Processing %s (in %s)', func, func_dict['module'])
 
             # Add nodes
             nodes = func_dict.get('nodes')
@@ -121,8 +121,8 @@ def create_cfg(jsons: Sequence[Path], entry_point: str = 'main',
                 callee = call['dst']
                 callee_dict = find_callee(cfg_dict, callee)
                 if 'entry' not in callee_dict:
-                    logging.debug('Callee `%s` (called from `%s`) is external. '
-                                  'Skipping', callee, caller)
+                    logging.debug('Callee %s (called from %s) is external. '
+                                  'Skipping...', callee, caller)
                     continue
 
                 src_node = create_cfg_node(mod, func, caller)
@@ -138,7 +138,7 @@ def create_cfg(jsons: Sequence[Path], entry_point: str = 'main',
                 # Add backward (return) edges
                 returns = callee_dict.get('returns')
                 if returns is None:
-                    logging.debug('Function `%s` (in %s) has no return '
+                    logging.debug('Function %s (in %s) has no return '
                                   'instruction(s)', callee,
                                   callee_dict['module'])
                     returns = []
