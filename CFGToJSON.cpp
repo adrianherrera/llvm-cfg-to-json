@@ -13,7 +13,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/IR/CFG.h"
-#include "llvm/IR/CallSite.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
@@ -126,10 +125,9 @@ bool CFGToJSON::runOnFunction(Function &F) {
 
     // Save the calls
     for (auto &I : *BB) {
-      if ((isa<CallInst>(I) && !isa<IntrinsicInst>(I)) || isa<InvokeInst>(I)) {
-        CallSite CS(&I);
+      if (const auto *CB = dyn_cast<CallBase>(&I)) {
         auto *CalledF = dyn_cast_or_null<Function>(
-            CS.getCalledValue()->stripPointerCasts());
+            CB->getCalledOperand()->stripPointerCasts());
         if (CalledF) {
           Json::Value JCall;
           JCall["src"] = BBLabel;
