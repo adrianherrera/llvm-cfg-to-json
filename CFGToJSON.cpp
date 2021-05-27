@@ -19,6 +19,7 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
@@ -30,6 +31,9 @@ using namespace llvm;
 #define DEBUG_TYPE "cfg-to-json"
 
 namespace {
+
+cl::opt<std::string> OutDir("cfg-outdir", cl::desc("Output directory"),
+                            cl::value_desc("directory"), cl::init("."));
 
 class CFGToJSON : public FunctionPass {
 public:
@@ -158,7 +162,8 @@ bool CFGToJSON::runOnFunction(Function &F) {
   JObj["indirect_calls"] = JIndirectCalls;
 
   StringRef ModName = sys::path::filename(M->getName());
-  std::string Filename = ("cfg." + ModName + "." + F.getName() + ".json").str();
+  SmallString<32> Filename(OutDir.c_str());
+  sys::path::append(Filename, "cfg." + ModName + "." + F.getName() + ".json");
   errs() << "Writing function '" << F.getName() << "' (module '" << M->getName()
          << "') to '" << Filename << "'...";
 
