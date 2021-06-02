@@ -14,6 +14,7 @@
 
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -117,7 +118,7 @@ bool CFGToJSON::runOnFunction(Function &F) {
     BBNode["size"] = sizeWithoutDebug(BB);
     JNodes[BBLabel] = BBNode;
 
-    // Save the edges
+    // Save the intra-procedural edges
     for (auto SI = succ_begin(BB), SE = succ_end(BB); SI != SE; ++SI) {
       Json::Value JEdge;
       JEdge["src"] = BBLabel;
@@ -127,18 +128,29 @@ bool CFGToJSON::runOnFunction(Function &F) {
       Worklist.push_back(*SI);
     }
 
-    // Save the calls
+    // Save the inter-procedural edges
     for (auto &I : *BB) {
+      if (I.isDebugOrPseudoInst()) {
+        continue;
+      }
+
       if (const auto *CB = dyn_cast<CallBase>(&I)) {
-        auto *CalledF = dyn_cast_or_null<Function>(
-            CB->getCalledOperand()->stripPointerCasts());
-        if (CalledF) {
+        if (CB->isIndirectCall()) {
+          JIndirectCalls.append(BBLabel);
+        } else {
+          const auto *Target = CB->getCalledOperand()->stripPointerCasts();
+
           Json::Value JCall;
           JCall["src"] = BBLabel;
-          JCall["dst"] = CalledF->getName().str();
+          JCall["dst"] = [&Target]() {
+            if (const auto *IAsm = dyn_cast<InlineAsm>(Target)) {
+              return IAsm->getAsmString();
+            } else {
+              return Target->getName().str();
+            }
+          }();
+
           JCalls.append(JCall);
-        } else {
-          JIndirectCalls.append(BBLabel);
         }
       }
     }

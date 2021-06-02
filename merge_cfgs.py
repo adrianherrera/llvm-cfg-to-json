@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Merge multiple LLVM CFG JSON files.
+Merge multiple LLVM CFG JSON files into a single JSON file.
 
 Author: Adrian Herrera
 """
