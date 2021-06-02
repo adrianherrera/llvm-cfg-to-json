@@ -41,8 +41,9 @@ public:
   static char ID;
   CFGToJSON() : FunctionPass(ID) {}
 
-  void getAnalysisUsage(AnalysisUsage &) const override;
-  bool runOnFunction(Function &) override;
+  virtual void getAnalysisUsage(AnalysisUsage &) const override;
+  virtual void print(raw_ostream &, const Module *) const override;
+  virtual bool runOnFunction(Function &) override;
 };
 
 } // anonymous namespace
@@ -85,6 +86,10 @@ sizeWithoutDebug(const BasicBlock *BB) {
 
 void CFGToJSON::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesAll();
+}
+
+void CFGToJSON::print(raw_ostream &OS, const Module *M) const {
+  // Nothing to do here
 }
 
 bool CFGToJSON::runOnFunction(Function &F) {
