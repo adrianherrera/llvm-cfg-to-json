@@ -55,14 +55,14 @@ def create_cfg(jsons: Sequence[Path], entry_point: str = 'main',
             logging.warning('%s is not a file. Skipping...', json_path)
             continue
 
-        logging.debug('Parsing %s', json_path)
+        logging.debug('Parsing module %s', json_path)
         with json_path.open() as inf:
-            data = json.load(inf)
+            mod_data = json.load(inf)
 
         # Build the CFG dictionary
-        mod = data['module']
-        func = data.pop('function')
-        cfg_dict[mod][func] = data
+        mod = json_path.stem
+        for func, func_data in mod_data.items():
+            cfg_dict[mod][func] = func_data
 
     # Turn the CFGs into a networkx graph
     cfg = nx.DiGraph()

@@ -48,12 +48,12 @@ def main():
             continue
 
         with json_path.open() as inf:
-            data = json.load(inf)
-        module = data.pop('module')
-        function = data.pop('function')
+            mod_data = json.load(inf)
+        mod = json_path.sten
 
-        assert function not in all_funcs[module]
-        all_funcs[module][function] = data
+        for func, func_data in mod_data.items():
+            assert func not in all_funcs[mod]
+            all_funcs[mod][func] = func_data
 
     # Output to JSON
     out_path = args.out

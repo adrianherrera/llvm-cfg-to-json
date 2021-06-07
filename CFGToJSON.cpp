@@ -33,17 +33,19 @@ using namespace llvm;
 
 namespace {
 
+using SourceRange = std::pair<DebugLoc, DebugLoc>;
+
 cl::opt<std::string> OutDir("cfg-outdir", cl::desc("Output directory"),
                             cl::value_desc("directory"), cl::init("."));
 
-class CFGToJSON : public FunctionPass {
+class CFGToJSON : public ModulePass {
 public:
   static char ID;
-  CFGToJSON() : FunctionPass(ID) {}
+  CFGToJSON() : ModulePass(ID) {}
 
   virtual void getAnalysisUsage(AnalysisUsage &) const override;
   virtual void print(raw_ostream &, const Module *) const override;
-  virtual bool runOnFunction(Function &) override;
+  virtual bool runOnModule(Module &) override;
 };
 
 } // anonymous namespace
@@ -63,7 +65,7 @@ static std::string getBBLabel(const BasicBlock *BB) {
   return OS.str();
 }
 
-static std::pair<DebugLoc, DebugLoc> getSourceRange(const BasicBlock *BB) {
+static SourceRange getSourceRange(const BasicBlock *BB) {
   DebugLoc Start;
   for (const auto &I : *BB) {
     const auto &DbgLoc = I.getDebugLoc();
@@ -92,103 +94,117 @@ void CFGToJSON::print(raw_ostream &OS, const Module *M) const {
   // Nothing to do here
 }
 
-bool CFGToJSON::runOnFunction(Function &F) {
-  const Module *M = F.getParent();
+bool CFGToJSON::runOnModule(Module &M) {
+  SmallPtrSet<const BasicBlock *, 32> SeenBBs;
+  SmallVector<const BasicBlock *, 32> Worklist;
 
-  SmallPtrSet<BasicBlock *, 32> SeenBBs;
-  SmallVector<BasicBlock *, 32> Worklist = {&F.getEntryBlock()};
+  SmallVector<std::pair<const StringRef, Json::Value>, 32> JFuncs;
+  Json::Value JNodes, JEdges, JCalls, JIndirectCalls, JReturns;
 
-  Json::Value JNodes;
-  Json::Value JEdges;
-  Json::Value JCalls;
-  Json::Value JIndirectCalls;
-  Json::Value JReturns;
-
-  while (!Worklist.empty()) {
-    auto *BB = Worklist.pop_back_val();
-
-    // Prevent loops
-    const auto Res = SeenBBs.insert(BB);
-    if (!Res.second) {
+  for (const auto &F : M) {
+    if (F.isDeclaration()) {
       continue;
     }
+    SeenBBs.clear();
+    Worklist.clear();
+    Worklist.push_back(&F.getEntryBlock());
 
-    // Save the node
-    const auto &BBLabel = getBBLabel(BB);
-    const auto &[SrcStart, SrcEnd] = getSourceRange(BB);
+    JNodes.clear();
+    JEdges.clear();
+    JCalls.clear();
+    JIndirectCalls.clear();
+    JReturns.clear();
 
-    Json::Value BBNode;
-    BBNode["start_line"] = SrcStart ? SrcStart.getLine() : Json::Value();
-    BBNode["end_line"] = SrcEnd ? SrcEnd.getLine() : Json::Value();
-    BBNode["size"] = sizeWithoutDebug(BB);
-    JNodes[BBLabel] = BBNode;
+    while (!Worklist.empty()) {
+      auto *BB = Worklist.pop_back_val();
 
-    // Save the intra-procedural edges
-    for (auto SI = succ_begin(BB), SE = succ_end(BB); SI != SE; ++SI) {
-      Json::Value JEdge;
-      JEdge["src"] = BBLabel;
-      JEdge["dst"] = getBBLabel(*SI);
-      JEdges.append(JEdge);
-
-      Worklist.push_back(*SI);
-    }
-
-    // Save the inter-procedural edges
-    for (auto &I : *BB) {
-      if (I.isDebugOrPseudoInst()) {
+      // Prevent loops
+      const auto Res = SeenBBs.insert(BB);
+      if (!Res.second) {
         continue;
       }
 
-      if (const auto *CB = dyn_cast<CallBase>(&I)) {
-        if (CB->isIndirectCall()) {
-          JIndirectCalls.append(BBLabel);
-        } else {
-          const auto *Target = CB->getCalledOperand()->stripPointerCasts();
+      // Save the node
+      const auto &BBLabel = getBBLabel(BB);
+      const auto &[SrcStart, SrcEnd] = getSourceRange(BB);
 
-          Json::Value JCall;
-          JCall["src"] = BBLabel;
-          JCall["dst"] = [&Target]() {
-            if (const auto *IAsm = dyn_cast<InlineAsm>(Target)) {
-              return IAsm->getAsmString();
-            } else {
-              return Target->getName().str();
-            }
-          }();
+      Json::Value JBB;
+      JBB["start_line"] = SrcStart ? SrcStart.getLine() : Json::Value();
+      JBB["end_line"] = SrcEnd ? SrcEnd.getLine() : Json::Value();
+      JBB["size"] = sizeWithoutDebug(BB);
+      JNodes[BBLabel] = JBB;
 
-          JCalls.append(JCall);
+      // Save the intra-procedural edges
+      for (auto SI = succ_begin(BB), SE = succ_end(BB); SI != SE; ++SI) {
+        Json::Value JEdge;
+        JEdge["src"] = BBLabel;
+        JEdge["dst"] = getBBLabel(*SI);
+        JEdges.append(JEdge);
+
+        Worklist.push_back(*SI);
+      }
+
+      // Save the inter-procedural edges
+      for (auto &I : *BB) {
+        // Skip debug instructions
+        if (I.isDebugOrPseudoInst()) {
+          continue;
         }
+
+        if (const auto *CB = dyn_cast<CallBase>(&I)) {
+          if (CB->isIndirectCall()) {
+            JIndirectCalls.append(BBLabel);
+          } else {
+            const auto *Target = CB->getCalledOperand()->stripPointerCasts();
+
+            Json::Value JCall;
+            JCall["src"] = BBLabel;
+            JCall["dst"] = [&Target]() {
+              if (const auto *IAsm = dyn_cast<InlineAsm>(Target)) {
+                return IAsm->getAsmString();
+              } else {
+                return Target->getName().str();
+              }
+            }();
+
+            JCalls.append(JCall);
+          }
+        }
+      }
+
+      // Save the return
+      if (isa<ReturnInst>(BB->getTerminator())) {
+        JReturns.append(BBLabel);
       }
     }
 
-    // Save the return
-    if (isa<ReturnInst>(BB->getTerminator())) {
-      JReturns.append(BBLabel);
-    }
+    // Save function
+    Json::Value JFunc;
+    JFunc["entry"] = getBBLabel(&F.getEntryBlock());
+    JFunc["nodes"] = JNodes;
+    JFunc["edges"] = JEdges;
+    JFunc["calls"] = JCalls;
+    JFunc["returns"] = JReturns;
+    JFunc["indirect_calls"] = JIndirectCalls;
+    JFuncs.push_back({F.getName(), JFunc});
   }
 
   // Print the results
+  Json::Value JMod;
+  for (const auto &[FuncName, JFunc] : JFuncs) {
+    JMod[FuncName.str()] = JFunc;
+  }
 
-  Json::Value JObj;
-  JObj["module"] = M->getName().str();
-  JObj["function"] = F.getName().str();
-  JObj["entry"] = getBBLabel(&F.getEntryBlock());
-  JObj["nodes"] = JNodes;
-  JObj["edges"] = JEdges;
-  JObj["calls"] = JCalls;
-  JObj["returns"] = JReturns;
-  JObj["indirect_calls"] = JIndirectCalls;
-
-  StringRef ModName = sys::path::filename(M->getName());
+  const auto ModName = sys::path::filename(M.getName());
   SmallString<32> Filename(OutDir.c_str());
-  sys::path::append(Filename, "cfg." + ModName + "." + F.getName() + ".json");
-  errs() << "Writing function '" << F.getName() << "' (module '" << M->getName()
-         << "') to '" << Filename << "'...";
+  sys::path::append(Filename, "cfg." + ModName + ".json");
+  errs() << "Writing module '" << M.getName() << "' to '" << Filename << "'...";
 
   std::error_code EC;
   raw_fd_ostream File(Filename, EC, sys::fs::F_Text);
 
   if (!EC) {
-    File << JObj.toStyledString();
+    File << JMod.toStyledString();
   } else {
     errs() << "  error opening file for writing!";
   }
