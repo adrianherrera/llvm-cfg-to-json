@@ -49,7 +49,7 @@ def main():
 
         with json_path.open() as inf:
             mod_data = json.load(inf)
-        mod = json_path.sten
+        mod = json_path.stem
 
         for func, func_data in mod_data.items():
             assert func not in all_funcs[mod]
