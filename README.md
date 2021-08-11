@@ -14,7 +14,7 @@ mkdir build
 cd build
 
 # If you have multiple LLVM versions installed, specify the one you want by
-# setting LLVM_DIR; e.g., -DLLVM_DIR=/usr/lib/llvm-10/lib/cmake/llvm
+# setting LLVM_DIR; e.g., -DLLVM_DIR=`llvm-config-12 --cmakedir`
 #
 # This probably also requires setting CC/CXX
 CC=clang CXX=clang++ cmake ..
