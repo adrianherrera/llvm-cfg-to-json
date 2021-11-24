@@ -98,8 +98,7 @@ bool CFGToJSON::runOnModule(Module &M) {
   SmallPtrSet<const BasicBlock *, 32> SeenBBs;
   SmallVector<const BasicBlock *, 32> Worklist;
 
-  SmallVector<std::pair<const StringRef, Json::Value>, 32> JFuncs;
-  Json::Value JNodes, JEdges, JCalls, JIndirectCalls, JReturns;
+  Json::Value JFuncs, JNodes, JEdges, JCalls, JIndirectCalls, JReturns;
 
   for (const auto &F : M) {
     if (F.isDeclaration()) {
@@ -147,7 +146,7 @@ bool CFGToJSON::runOnModule(Module &M) {
       // Save the inter-procedural edges
       for (auto &I : *BB) {
         // Skip debug instructions
-        if (I.isDebugOrPseudoInst()) {
+        if (isa<DbgInfoIntrinsic>(&I)) {
           continue;
         }
 
@@ -180,20 +179,20 @@ bool CFGToJSON::runOnModule(Module &M) {
 
     // Save function
     Json::Value JFunc;
+    JFunc["name"] = F.getName().str();
     JFunc["entry"] = getBBLabel(&F.getEntryBlock());
     JFunc["nodes"] = JNodes;
     JFunc["edges"] = JEdges;
     JFunc["calls"] = JCalls;
     JFunc["returns"] = JReturns;
     JFunc["indirect_calls"] = JIndirectCalls;
-    JFuncs.push_back({F.getName(), JFunc});
+    JFuncs.append(JFunc);
   }
 
   // Print the results
   Json::Value JMod;
-  for (const auto &[FuncName, JFunc] : JFuncs) {
-    JMod[FuncName.str()] = JFunc;
-  }
+  JMod["module"] = M.getName().str();
+  JMod["functions"] = JFuncs;
 
   const auto ModName = sys::path::filename(M.getName());
   SmallString<32> Filename(OutDir.c_str());
