@@ -38,6 +38,18 @@ using SourceRange = std::pair<DebugLoc, DebugLoc>;
 cl::opt<std::string> OutDir("cfg-outdir", cl::desc("Output directory"),
                             cl::value_desc("directory"), cl::init("."));
 
+// Not available in older LLVM versions
+static std::string getNameOrAsOperand(const Value *V) {
+  if (!V->getName().empty()) {
+    return std::string(V->getName());
+  }
+
+  std::string BBName;
+  raw_string_ostream OS(BBName);
+  V->printAsOperand(OS, false);
+  return OS.str();
+}
+
 class CFGToJSON : public ModulePass {
 public:
   static char ID;
@@ -76,14 +88,6 @@ static SourceRange getSourceRange(const BasicBlock *BB) {
   }
 
   return {Start, BB->getTerminator()->getDebugLoc()};
-}
-
-static filter_iterator<
-    BasicBlock::const_iterator,
-    std::function<bool(const Instruction &)>>::difference_type
-sizeWithoutDebug(const BasicBlock *BB) {
-  return std::distance(BB->instructionsWithoutDebug().begin(),
-                       BB->instructionsWithoutDebug().end());
 }
 
 void CFGToJSON::getAnalysisUsage(AnalysisUsage &AU) const {
@@ -130,7 +134,6 @@ bool CFGToJSON::runOnModule(Module &M) {
       Json::Value JBB;
       JBB["start_line"] = SrcStart ? SrcStart.getLine() : Json::Value();
       JBB["end_line"] = SrcEnd ? SrcEnd.getLine() : Json::Value();
-      JBB["size"] = sizeWithoutDebug(BB);
       JNodes[BBLabel] = JBB;
 
       // Save the intra-procedural edges
@@ -179,7 +182,7 @@ bool CFGToJSON::runOnModule(Module &M) {
 
     // Save function
     Json::Value JFunc;
-    JFunc["name"] = F.getName().str();
+    JFunc["name"] = getNameOrAsOperand(&F);
     JFunc["entry"] = getBBLabel(&F.getEntryBlock());
     JFunc["nodes"] = JNodes;
     JFunc["edges"] = JEdges;
