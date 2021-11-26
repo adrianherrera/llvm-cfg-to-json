@@ -50,6 +50,24 @@ static std::string getNameOrAsOperand(const Value *V) {
   return OS.str();
 }
 
+// Adapted from seadsa
+static const Value *getCalledFunctionThroughAliasesAndCasts(const Value *V) {
+  const Value *CalledV = V->stripPointerCasts();
+
+  if (const Function *F = dyn_cast<const Function>(CalledV)) {
+    return F;
+  }
+
+  if (const GlobalAlias *GA = dyn_cast<const GlobalAlias>(CalledV)) {
+    if (const Function *F =
+            dyn_cast<const Function>(GA->getAliasee()->stripPointerCasts())) {
+      return F;
+    }
+  }
+
+  return CalledV;
+}
+
 class CFGToJSON : public ModulePass {
 public:
   static char ID;
@@ -102,7 +120,7 @@ bool CFGToJSON::runOnModule(Module &M) {
   SmallPtrSet<const BasicBlock *, 32> SeenBBs;
   SmallVector<const BasicBlock *, 32> Worklist;
 
-  Json::Value JFuncs, JNodes, JEdges, JCalls, JIndirectCalls, JReturns;
+  Json::Value JFuncs, JBlocks, JEdges, JCalls, JUnresolvedCalls, JReturns;
 
   for (const auto &F : M) {
     if (F.isDeclaration()) {
@@ -112,35 +130,35 @@ bool CFGToJSON::runOnModule(Module &M) {
     Worklist.clear();
     Worklist.push_back(&F.getEntryBlock());
 
-    JNodes.clear();
+    JBlocks.clear();
     JEdges.clear();
     JCalls.clear();
-    JIndirectCalls.clear();
+    JUnresolvedCalls.clear();
     JReturns.clear();
 
     while (!Worklist.empty()) {
       auto *BB = Worklist.pop_back_val();
 
       // Prevent loops
-      const auto Res = SeenBBs.insert(BB);
-      if (!Res.second) {
+      if (!SeenBBs.insert(BB).second) {
         continue;
       }
 
-      // Save the node
+      // Save the basic block
       const auto &BBLabel = getBBLabel(BB);
       const auto &[SrcStart, SrcEnd] = getSourceRange(BB);
 
-      Json::Value JBB;
-      JBB["start_line"] = SrcStart ? SrcStart.getLine() : Json::Value();
-      JBB["end_line"] = SrcEnd ? SrcEnd.getLine() : Json::Value();
-      JNodes[BBLabel] = JBB;
+      Json::Value JBlock;
+      JBlock["start_line"] = SrcStart ? SrcStart.getLine() : Json::Value();
+      JBlock["end_line"] = SrcEnd ? SrcEnd.getLine() : Json::Value();
+      JBlocks[BBLabel] = JBlock;
 
       // Save the intra-procedural edges
       for (auto SI = succ_begin(BB), SE = succ_end(BB); SI != SE; ++SI) {
         Json::Value JEdge;
         JEdge["src"] = BBLabel;
         JEdge["dst"] = getBBLabel(*SI);
+        JEdge["type"] = BB->getTerminator()->getOpcodeName();
         JEdges.append(JEdge);
 
         Worklist.push_back(*SI);
@@ -155,9 +173,10 @@ bool CFGToJSON::runOnModule(Module &M) {
 
         if (const auto *CB = dyn_cast<CallBase>(&I)) {
           if (CB->isIndirectCall()) {
-            JIndirectCalls.append(BBLabel);
+            JUnresolvedCalls.append(BBLabel);
           } else {
-            const auto *Target = CB->getCalledOperand()->stripPointerCasts();
+            const auto *Target =
+                getCalledFunctionThroughAliasesAndCasts(CB->getCalledOperand());
 
             Json::Value JCall;
             JCall["src"] = BBLabel;
@@ -165,18 +184,29 @@ bool CFGToJSON::runOnModule(Module &M) {
               if (const auto *IAsm = dyn_cast<InlineAsm>(Target)) {
                 return IAsm->getAsmString();
               } else {
-                return Target->getName().str();
+                return getNameOrAsOperand(Target);
               }
             }();
+            JCall["type"] = I.getOpcodeName();
 
             JCalls.append(JCall);
           }
         }
       }
 
-      // Save the return
-      if (isa<ReturnInst>(BB->getTerminator())) {
-        JReturns.append(BBLabel);
+      const auto *Term = BB->getTerminator();
+      assert(!isa<CatchSwitchInst>(Term) &&
+             "catchswitch instruction not yet supported");
+      assert(!isa<CatchReturnInst>(Term) &&
+             "catchret instruction not yet supported");
+      assert(!isa<CleanupReturnInst>(Term) &&
+             "cleanupret instruction not yet supported");
+      if (isa<ReturnInst>(Term) || isa<ResumeInst>(Term)) {
+        Json::Value JReturn;
+        JReturn["block"] = BBLabel;
+        JReturn["type"] = Term->getOpcodeName();
+
+        JReturns.append(JReturn);
       }
     }
 
@@ -184,11 +214,11 @@ bool CFGToJSON::runOnModule(Module &M) {
     Json::Value JFunc;
     JFunc["name"] = getNameOrAsOperand(&F);
     JFunc["entry"] = getBBLabel(&F.getEntryBlock());
-    JFunc["nodes"] = JNodes;
+    JFunc["blocks"] = JBlocks;
     JFunc["edges"] = JEdges;
     JFunc["calls"] = JCalls;
     JFunc["returns"] = JReturns;
-    JFunc["indirect_calls"] = JIndirectCalls;
+    JFunc["unresolved_calls"] = JUnresolvedCalls;
     JFuncs.append(JFunc);
   }
 
